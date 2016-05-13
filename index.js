@@ -9,7 +9,8 @@ let completed = false
 const requestOptions = {
   timeout: 40000,
   headers: {
-    Cookie: cookieString
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:49.0) Gecko/20100101 Firefox/49.0',
+    'Cookie': cookieString
   }
 }
 const ITEMS_ON_PAGE = 30
@@ -26,7 +27,7 @@ let parsePageWithLinks = (html) => {
 }
 
 let downloadPageWithLinks = (url) => new Promise((resolve, reject) => {
-  console.log(`Crawling page #${url}`)
+  console.log(`Crawling page with items: ${url}`)
   request.get(url, requestOptions, (err, resp, body) => {
     if (err) return reject(err)
     if (body.indexOf('We couldn\'t find any transcript results to match your search.\n</div>') > -1) {
