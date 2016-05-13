@@ -21,14 +21,14 @@ let parsePageWithLinks = (html) => {
   $('.transcripts-wrapper').find('a').each(function(index, item) {
     links.push(`https://www.olark.com${item.attribs.href}`)
   })
-
+  console.log(`Extracted ${links.length} links`)
   return links
 }
 
 let downloadPageWithLinks = (url) => new Promise((resolve, reject) => {
   console.log(`Crawling page #${url}`)
   request.get(url, requestOptions, (err, resp, body) => {
-    if (err) throw err
+    if (err) return reject(err)
     if (body.indexOf('We couldn\'t find any transcript results to match your search.\n</div>') > -1) {
       console.log('Pagination end reached')
       completed = true
@@ -39,22 +39,28 @@ let downloadPageWithLinks = (url) => new Promise((resolve, reject) => {
 })
 
 let downloadLink = (url) => new Promise((resolve, reject) => {
-  console.log('Getting', url)
+  console.log(`Getting ${url}`)
   request.get(url, requestOptions, (err, resp, body) => {
-    if (err) throw err
-    resolve({
-      html: body,
-      url: url
-    })
+    if (err || !body.length) {
+      console.log(`Got empty body.. Waiting`)
+      reject()
+    } else {
+      resolve({
+        html: body,
+        url: url
+      })
+    }
   })
 })
 
 let parseLink = (obj) => {
   let $ = cheerio.load(obj.html)
 
+  let divHTML = $('div.transcripts-module').html()
+
   return {
     url: obj.url,
-    data: `<div class="transcripts-module">${$('div.transcripts-module').html()}</div>`
+    data: `<div class="transcripts-module">${divHTML}</div>`
   }
 }
 
@@ -73,10 +79,10 @@ Rx.Observable
   .map(_ => `https://www.olark.com/transcripts/show?start_position=${startFromPage++ * ITEMS_ON_PAGE}`)
   .flatMap(_ => Rx.Observable.defer(() => downloadPageWithLinks(_)))
   .doWhile(_ => !completed)
-  // .take(2)
-  .scan(_ => _)
+  .filter(_ => _)
+  // .take(3)
   .flatMap(_ => parsePageWithLinks(_))
-  .flatMapWithMaxConcurrent(10, _ => Rx.Observable.defer(() => downloadLink(_)))
+  .flatMapWithMaxConcurrent(5, _ => Rx.Observable.defer(() => downloadLink(_)).retryWhen(e => e.delay(8000)))
   .map(_ => parseLink(_))
   .map(_ => saveToFile(_))
   .subscribe((data) => {}, (err) => {
