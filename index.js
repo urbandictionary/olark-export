@@ -5,7 +5,6 @@ import cheerio from 'cheerio'
 import cookieString from './olark-cookie'
 
 let completed = false
-let startFromPage = 0
 
 const requestOptions = {
   timeout: 40000,
@@ -20,8 +19,7 @@ let parsePageWithLinks = (html) => {
   let $ = cheerio.load(html)
 
   $('.transcripts-wrapper').find('a').each(function(index, item) {
-    console.log('found', item.attribs.href)
-    links.push(`https://www.olark.com/${item.attribs.href}`)
+    links.push(`https://www.olark.com${item.attribs.href}`)
   })
 
   return links
@@ -31,8 +29,8 @@ let downloadPageWithLinks = (url) => new Promise((resolve, reject) => {
   console.log(`Crawling page #${url}`)
   request.get(url, requestOptions, (err, resp, body) => {
     if (err) throw err
-    if (body.indexOf('class="transcript-not-found"') > -1) {
-      console.log('completed')
+    if (body.indexOf('We couldn\'t find any transcript results to match your search.\n</div>') > -1) {
+      console.log('Pagination end reached')
       completed = true
       return resolve(null)
     }
@@ -68,12 +66,14 @@ let saveToFile = (obj) => {
   return filename
 }
 
+let startFromPage = 0
+
 Rx.Observable
   .return(startFromPage)
   .map(_ => `https://www.olark.com/transcripts/show?start_position=${startFromPage++ * ITEMS_ON_PAGE}`)
   .flatMap(_ => Rx.Observable.defer(() => downloadPageWithLinks(_)))
   .doWhile(_ => !completed)
-  .take(2)
+  // .take(2)
   .scan(_ => _)
   .flatMap(_ => parsePageWithLinks(_))
   .flatMapWithMaxConcurrent(10, _ => Rx.Observable.defer(() => downloadLink(_)))
