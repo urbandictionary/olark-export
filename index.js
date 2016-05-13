@@ -15,6 +15,8 @@ const requestOptions = {
 }
 const ITEMS_ON_PAGE = 30
 
+let getTranscriptName = (url) => `${url.split('/').pop()}.html`
+
 let parsePageWithLinks = (html) => {
   let links = []
   let $ = cheerio.load(html)
@@ -67,11 +69,21 @@ let parseLink = (obj) => {
 }
 
 let saveToFile = (obj) => {
-  let filename = `${obj.url.split('/').pop()}.html`
+  let filename = getTranscriptName(obj.url)
   fs.writeFile(`transcripts/${filename}`, obj.data, () => {
     console.log(`${filename} saved`)
   })
   return filename
+}
+
+let transcriptAlreadyExist = (url) => {
+  let filename = getTranscriptName(url)
+  try {
+    fs.accessSync(`transcripts/${filename}`)
+    return true
+  } catch (e) {
+    return false
+  }
 }
 
 let startFromPage = 0
@@ -84,6 +96,7 @@ Rx.Observable
   .filter(_ => _)
   // .take(3)
   .flatMap(_ => parsePageWithLinks(_))
+  .filter(_ => !transcriptAlreadyExist(_))
   .flatMapWithMaxConcurrent(5, _ => Rx.Observable.defer(() => downloadLink(_)).retryWhen(e => e.delay(8000)))
   .map(_ => parseLink(_))
   .map(_ => saveToFile(_))
