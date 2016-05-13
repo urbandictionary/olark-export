@@ -22,6 +22,7 @@ let parsePageWithLinks = (html) => {
   $('.transcripts-wrapper').find('a').each(function(index, item) {
     links.push(`https://www.olark.com${item.attribs.href}`)
   })
+
   console.log(`Extracted ${links.length} links`)
   return links
 }
@@ -29,7 +30,7 @@ let parsePageWithLinks = (html) => {
 let downloadPageWithLinks = (url) => new Promise((resolve, reject) => {
   console.log(`Crawling page with items: ${url}`)
   request.get(url, requestOptions, (err, resp, body) => {
-    if (err) return reject(err)
+    if (err || !body.length) return reject(err)
     if (body.indexOf('We couldn\'t find any transcript results to match your search.\n</div>') > -1) {
       console.log('Pagination end reached')
       completed = true
@@ -78,7 +79,7 @@ let startFromPage = 0
 Rx.Observable
   .return(startFromPage)
   .map(_ => `https://www.olark.com/transcripts/show?start_position=${startFromPage++ * ITEMS_ON_PAGE}`)
-  .flatMap(_ => Rx.Observable.defer(() => downloadPageWithLinks(_)))
+  .flatMap(_ => Rx.Observable.defer(() => downloadPageWithLinks(_)).retryWhen(e => e.delay(8000)))
   .doWhile(_ => !completed)
   .filter(_ => _)
   // .take(3)
