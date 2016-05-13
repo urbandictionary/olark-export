@@ -14,7 +14,7 @@ const requestOptions = {
   }
 }
 const ITEMS_ON_PAGE = 30
-
+const WAIT_TIMEOUT = 8000
 let getTranscriptName = (url) => `${url.split('/').pop()}.html`
 
 let parsePageWithLinks = (html) => {
@@ -91,13 +91,13 @@ let startFromPage = 0
 Rx.Observable
   .return(startFromPage)
   .map(_ => `https://www.olark.com/transcripts/show?start_position=${startFromPage++ * ITEMS_ON_PAGE}`)
-  .flatMap(_ => Rx.Observable.defer(() => downloadPageWithLinks(_)).retryWhen(e => e.delay(8000)))
+  .flatMap(_ => Rx.Observable.defer(() => downloadPageWithLinks(_)).retryWhen(e => e.delay(WAIT_TIMEOUT)))
   .doWhile(_ => !completed)
   .filter(_ => _)
   // .take(3)
   .flatMap(_ => parsePageWithLinks(_))
   .filter(_ => !transcriptAlreadyExist(_))
-  .flatMapWithMaxConcurrent(5, _ => Rx.Observable.defer(() => downloadLink(_)).retryWhen(e => e.delay(8000)))
+  .flatMapWithMaxConcurrent(5, _ => Rx.Observable.defer(() => downloadLink(_)).retryWhen(e => e.delay(WAIT_TIMEOUT)))
   .map(_ => parseLink(_))
   .map(_ => saveToFile(_))
   .subscribe((data) => {}, (err) => {
